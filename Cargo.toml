@@ -10,6 +10,7 @@ homepage = "https://github.com/akav-labs/agentsentry-gateway"
 keywords = ["llm", "security", "dlp", "gateway", "ai"]
 categories = ["network-programming", "web-programming"]
 readme = "README.md"
+exclude = ["assets/", "demo.gif", "demo.cast", ".github/"]
 
 [dependencies]
 axum = "0.7"

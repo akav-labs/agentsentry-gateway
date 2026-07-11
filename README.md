@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/banner.png" alt="AgentSentry Gateway — transparent security gateway for LLM agents" width="840">
+<img src="https://raw.githubusercontent.com/akav-labs/agentsentry-gateway/main/assets/banner.png" alt="AgentSentry Gateway — transparent security gateway for LLM agents" width="840">
 
 <br><br>
 
@@ -19,7 +19,7 @@ Violations are blocked; clean traffic is forwarded to the real API, untouched.
 
 <br><br>
 
-<img src="demo.gif" alt="AgentSentry Gateway blocking a jailbreak + AWS-key leak, and forwarding a clean request" width="840">
+<img src="https://raw.githubusercontent.com/akav-labs/agentsentry-gateway/main/demo.gif" alt="AgentSentry Gateway blocking a jailbreak + AWS-key leak, and forwarding a clean request" width="840">
 
 </div>
 
@@ -150,8 +150,8 @@ benign-corpus check so we don't regress on false positives. See
 
 <div align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/agentsentry-mark-reversed.svg">
-    <img src="assets/agentsentry-mark.svg" alt="AgentSentry" width="34">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/akav-labs/agentsentry-gateway/main/assets/agentsentry-mark-reversed.svg">
+    <img src="https://raw.githubusercontent.com/akav-labs/agentsentry-gateway/main/assets/agentsentry-mark.svg" alt="AgentSentry" width="34">
   </picture>
   <br><br>
   <strong>AgentSentry</strong> — built by <a href="https://akav.io"><strong>Akav&nbsp;Labs</strong></a><br>
