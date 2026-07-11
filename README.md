@@ -1,22 +1,27 @@
-# AgentSentry Gateway
+<div align="center">
 
-**A transparent, OpenAI-compatible security gateway for LLM agents.** Point your
-agent at it with one environment variable and every request is scanned before it
-leaves your network — leaked secrets & PII, jailbreaks, prompt injection, and
-MITRE ATLAS techniques. Violations are blocked; clean traffic is forwarded to the
-real API, untouched.
+<img src="assets/banner.png" alt="AgentSentry Gateway — transparent security gateway for LLM agents" width="840">
 
-No database. No account. No telemetry. It runs entirely on your machine.
+<br><br>
 
-<sub>Open-source core of the [AgentSentry](https://akav.io) platform, by **Akav Labs**.</sub>
-
-[![CI](https://github.com/akav-labs/agentsentry-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/akav-labs/agentsentry-gateway/actions/workflows/ci.yml)
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
+[![CI](https://github.com/akav-labs/agentsentry-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/akav-labs/agentsentry-gateway/actions/workflows/ci.yml) &nbsp;
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE) &nbsp;
 [![Image](https://img.shields.io/badge/ghcr.io-agentsentry--gateway-blue?logo=docker)](https://github.com/akav-labs/agentsentry-gateway/pkgs/container/agentsentry-gateway)
 
-<p align="center">
-  <img src="demo.gif" alt="AgentSentry Gateway blocking a jailbreak + AWS-key leak, and forwarding a clean request" width="820">
-</p>
+<br>
+
+**A transparent, OpenAI-compatible security gateway for LLM agents.**<br>
+One environment variable, and every request is scanned before it leaves your network —
+leaked secrets &amp; PII, jailbreaks, prompt injection, and MITRE ATLAS techniques.<br>
+Violations are blocked; clean traffic is forwarded to the real API, untouched.
+
+<sub><b>No database &nbsp;·&nbsp; No account &nbsp;·&nbsp; No telemetry</b> &nbsp;—&nbsp; it runs entirely on your machine.</sub>
+
+<br><br>
+
+<img src="demo.gif" alt="AgentSentry Gateway blocking a jailbreak + AWS-key leak, and forwarding a clean request" width="840">
+
+</div>
 
 ---
 
@@ -136,6 +141,11 @@ benign-corpus check so we don't regress on false positives. See
 ---
 
 <div align="center">
-  <strong>AgentSentry</strong> — built by <a href="https://akav.io"><strong>Akav Labs</strong></a><br>
-  <sub>Securing the agentic enterprise. · <a href="https://akav.io">akav.io</a></sub>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/agentsentry-mark-reversed.svg">
+    <img src="assets/agentsentry-mark.svg" alt="AgentSentry" width="34">
+  </picture>
+  <br><br>
+  <strong>AgentSentry</strong> — built by <a href="https://akav.io"><strong>Akav&nbsp;Labs</strong></a><br>
+  <sub>Securing the agentic enterprise &nbsp;·&nbsp; <a href="https://akav.io">akav.io</a></sub>
 </div>

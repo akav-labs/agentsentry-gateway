@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 340" width="1200" height="340" font-family="Hanken Grotesk, 'Liberation Sans', 'DejaVu Sans', system-ui, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2b271f"/>
+      <stop offset="1" stop-color="#211d18"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="1200" height="340" rx="28" fill="url(#bg)"/>
+  <!-- faint concentric arches, decorative -->
+  <g fill="none" stroke="#F1EADD" stroke-linecap="round" opacity="0.05">
+    <path d="M980 300 L980 150 A150 150 0 0 1 1280 150 L1280 300" stroke-width="10"/>
+    <path d="M1040 300 L1040 190 A110 110 0 0 1 1260 190 L1260 300" stroke-width="10"/>
+  </g>
+  <!-- the mark -->
+  <g transform="translate(2,-8) scale(2.7)" fill="none" stroke="#F1EADD" stroke-width="8" stroke-linecap="round">
+    <path d="M24 84 L24 47 A26 26 0 0 1 76 47 L76 84"/>
+  </g>
+  <!-- wordmark -->
+  <text x="250" y="158" font-weight="600" font-size="76" letter-spacing="-2.5" fill="#F1EADD">AgentSentry<tspan fill="#B4674C">.</tspan></text>
+  <!-- tagline -->
+  <text x="253" y="208" font-weight="400" font-size="28" fill="#F1EADD" fill-opacity="0.74">Transparent security gateway for LLM agents</text>
+  <!-- meta line -->
+  <text x="255" y="262" font-family="ui-monospace, 'Liberation Mono', monospace" font-size="18" letter-spacing="2.5" fill="#F1EADD" fill-opacity="0.42">DLP  ·  JAILBREAK  ·  PROMPT-INJECTION  ·  MITRE ATLAS</text>
+  <!-- corner meta -->
+  <text x="1160" y="312" text-anchor="end" font-family="ui-monospace, 'Liberation Mono', monospace" font-size="17" fill="#F1EADD" fill-opacity="0.4">Apache-2.0  ·  by Akav Labs</text>
+</svg>
