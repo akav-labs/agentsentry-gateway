@@ -8,8 +8,7 @@ than the attacks it detects. Thank you for helping keep it trustworthy.
 **Please do not open a public issue for a security vulnerability.**
 
 Report privately through **[GitHub Private Vulnerability Reporting](https://github.com/akav-labs/agentsentry-gateway/security/advisories/new)**
-(the "Report a vulnerability" button on the Security tab), or email
-**security@akav.io**.
+(the "Report a vulnerability" button on the Security tab)
 
 Please include:
 
