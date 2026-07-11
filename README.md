@@ -10,7 +10,9 @@ No database. No account. No telemetry. It runs entirely on your machine.
 
 <sub>Open-source core of the [AgentSentry](https://akav.io) platform, by **Akav Labs**.</sub>
 
+[![CI](https://github.com/akav-labs/agentsentry-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/akav-labs/agentsentry-gateway/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
+[![Image](https://img.shields.io/badge/ghcr.io-agentsentry--gateway-blue?logo=docker)](https://github.com/akav-labs/agentsentry-gateway/pkgs/container/agentsentry-gateway)
 
 ---
 
