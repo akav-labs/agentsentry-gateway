@@ -121,6 +121,14 @@ send nothing, handy for a shared internal endpoint).
   `agentsentry_blocked_total{rule}`).
 - Structured JSON logs; blocked requests log the caller fingerprint and matched rules.
 
+## Performance
+
+Detection is regex-based (linear / DFA — no catastrophic backtracking) and runs
+entirely in-process, so it's cheap. A blocked request is scanned against **all 73
+DLP rules + 97 ATLAS techniques + the jailbreak/injection patterns** and rejected in
+**~0.75 ms (p50) / ~1.4 ms (p95)** on commodity hardware — with no network hop at
+all. Clean requests pay the same scan, then stream straight through to your upstream.
+
 ## What's not here
 
 This is the **single-agent gateway** — the enforcement core. The full
