@@ -14,6 +14,10 @@ No database. No account. No telemetry. It runs entirely on your machine.
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
 [![Image](https://img.shields.io/badge/ghcr.io-agentsentry--gateway-blue?logo=docker)](https://github.com/akav-labs/agentsentry-gateway/pkgs/container/agentsentry-gateway)
 
+<p align="center">
+  <img src="demo.gif" alt="AgentSentry Gateway blocking a jailbreak + AWS-key leak, and forwarding a clean request" width="820">
+</p>
+
 ---
 
 ## The one-line integration
