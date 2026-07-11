@@ -15,9 +15,9 @@ mod fingerprint;
 use axum::{
     body::{Body, Bytes},
     extract::State,
-    http::{HeaderMap, HeaderName, HeaderValue, StatusCode, Uri},
+    http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode, Uri},
     response::{IntoResponse, Response},
-    routing::{get, post},
+    routing::{any, get},
     Json, Router,
 };
 use once_cell::sync::Lazy;
@@ -110,7 +110,10 @@ async fn main() {
         .route("/health", get(|| async { "ok" }))
         .route("/healthz", get(|| async { "ok" }))
         .route("/metrics", get(metrics))
-        .route("/v1/*path", post(proxy))
+        // Any method: chat/completions & friends are POST (scanned), but real
+        // OpenAI clients also GET /v1/models etc. — those pass straight through
+        // (no body to scan) instead of 405-ing.
+        .route("/v1/*path", any(proxy))
         .with_state(state)
         .layer(tower_http::trace::TraceLayer::new_for_http());
 
@@ -149,7 +152,7 @@ fn prompt_text(body: &Value) -> String {
     parts.join(" ")
 }
 
-async fn proxy(State(s): State<AppState>, uri: Uri, headers: HeaderMap, body: Bytes) -> Response {
+async fn proxy(State(s): State<AppState>, method: Method, uri: Uri, headers: HeaderMap, body: Bytes) -> Response {
     let fp = serde_json::from_slice::<Value>(&body).ok()
         .map(|b| fingerprint::extract(&headers, &b));
     let agent = fp.as_ref().map(|f| f.hash.clone()).unwrap_or_else(|| "unknown".into());
@@ -192,7 +195,8 @@ async fn proxy(State(s): State<AppState>, uri: Uri, headers: HeaderMap, body: By
     let url = format!("{}{}", s.cfg.upstream_base_url, path_q);
     let streaming = body_val["stream"].as_bool().unwrap_or(false);
 
-    let mut req = s.http.post(&url).header("content-type", "application/json").body(body.clone());
+    let mut req = s.http.request(method, &url).body(body.clone());
+    if let Some(ct_in) = headers.get("content-type") { req = req.header("content-type", ct_in); }
     // Auth: gateway key (sandbox mode) overrides; else pass the caller's own key.
     if !s.cfg.upstream_api_key.is_empty() {
         req = req.header("authorization", format!("Bearer {}", s.cfg.upstream_api_key));
@@ -223,7 +227,8 @@ async fn proxy(State(s): State<AppState>, uri: Uri, headers: HeaderMap, body: By
         out = out.header("content-type", ct);
         out = out.header("x-agentsentry", "clean");
         out = out.header("x-powered-by", "AgentSentry Gateway (Akav Labs)");
-        return out.body(Body::from_stream(resp.bytes_stream())).unwrap();
+        return out.body(Body::from_stream(resp.bytes_stream()))
+            .unwrap_or_else(|_| StatusCode::BAD_GATEWAY.into_response());
     }
 
     // Non-streaming: scan the response body too (catches jailbreak-success and
