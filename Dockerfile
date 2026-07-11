@@ -1,6 +1,6 @@
 # Build a static-ish, self-contained gateway binary. Uses rustls (no OpenSSL),
 # so the build and runtime images stay tiny with no system TLS dependencies.
-FROM rust:1.83-slim AS builder
+FROM rust:1.96-slim AS builder
 WORKDIR /app
 COPY Cargo.toml Cargo.lock* ./
 COPY src ./src

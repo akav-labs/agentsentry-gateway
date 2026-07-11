@@ -2,6 +2,7 @@
 name = "agentsentry-gateway"
 version = "0.1.0"
 edition = "2021"
+authors = ["Akav Labs <akavlabs@users.noreply.github.com>"]
 license = "Apache-2.0"
 description = "Transparent OpenAI-compatible security gateway for LLM agents: DLP, secret-leak, jailbreak and prompt-injection detection at the egress."
 repository = "https://github.com/akav-labs/agentsentry-gateway"

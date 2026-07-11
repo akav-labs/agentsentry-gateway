@@ -128,3 +128,10 @@ benign-corpus check so we don't regress on false positives. See
 ## License
 
 [Apache-2.0](./LICENSE) © Akav Labs.
+
+---
+
+<div align="center">
+  <strong>AgentSentry</strong> — built by <a href="https://akav.io"><strong>Akav Labs</strong></a><br>
+  <sub>Securing the agentic enterprise. · <a href="https://akav.io">akav.io</a></sub>
+</div>

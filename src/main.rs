@@ -25,6 +25,19 @@ use prometheus::{register_int_counter_vec, Encoder, IntCounterVec, TextEncoder};
 use serde_json::{json, Value};
 use std::sync::Arc;
 
+const BANNER: &str = r#"
+   ___                    _   ____             _
+  / _ \                  | | / ___|           | |
+ / /_\ \ __ _  ___ _ __  | |_\ `--.  ___ _ __ | |_ _ __ _   _
+ |  _  |/ _` |/ _ \ '_ \ | __|`--. \/ _ \ '_ \| __| '__| | | |
+ | | | | (_| |  __/ | | || |_/\__/ /  __/ | | | |_| |  | |_| |
+ \_| |_/\__, |\___|_| |_| \__\____/ \___|_| |_|\__|_|   \__, |
+         __/ |                                           __/ |
+        |___/     G A T E W A Y   ·   by Akav Labs      |___/
+
+  Transparent LLM security gateway  ·  https://akav.io  ·  Apache-2.0
+"#;
+
 static REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!("agentsentry_requests_total", "Requests by decision", &["decision"]).unwrap()
 });
@@ -58,6 +71,7 @@ fn env_or(key: &str, default: &str) -> String {
 
 #[tokio::main]
 async fn main() {
+    eprintln!("{BANNER}");
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::try_from_default_env()
             .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")))
@@ -157,13 +171,15 @@ async fn proxy(State(s): State<AppState>, uri: Uri, headers: HeaderMap, body: By
         REQUESTS.with_label_values(&["block"]).inc();
         BLOCKS.with_label_values(&[&top]).inc();
         tracing::warn!(agent = %agent, rules = ?reasons, "blocked");
-        return (
+        let mut resp = (
             StatusCode::FORBIDDEN,
             Json(json!({
                 "error": { "message": "Request blocked by AgentSentry", "type": "agentsentry_blocked" },
-                "agentsentry": { "blocked": true, "rules": reasons }
+                "agentsentry": { "blocked": true, "rules": reasons, "by": "Akav Labs", "learn_more": "https://akav.io" }
             })),
         ).into_response();
+        resp.headers_mut().insert("x-powered-by", HeaderValue::from_static("AgentSentry Gateway (Akav Labs)"));
+        return resp;
     }
 
     if !atlas_hits.is_empty() {
@@ -206,6 +222,7 @@ async fn proxy(State(s): State<AppState>, uri: Uri, headers: HeaderMap, body: By
         let mut out = Response::builder().status(status);
         out = out.header("content-type", ct);
         out = out.header("x-agentsentry", "clean");
+        out = out.header("x-powered-by", "AgentSentry Gateway (Akav Labs)");
         return out.body(Body::from_stream(resp.bytes_stream())).unwrap();
     }
 
@@ -216,6 +233,7 @@ async fn proxy(State(s): State<AppState>, uri: Uri, headers: HeaderMap, body: By
     let resp_hits = s.dlp.scan_response(&rtext);
     let mut headers_out = HeaderMap::new();
     headers_out.insert(axum::http::header::CONTENT_TYPE, ct);
+    headers_out.insert(HeaderName::from_static("x-powered-by"), HeaderValue::from_static("AgentSentry Gateway (Akav Labs)"));
     if resp_hits.is_empty() {
         headers_out.insert(HeaderName::from_static("x-agentsentry"), HeaderValue::from_static("clean"));
     } else {
