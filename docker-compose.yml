@@ -1,0 +1,21 @@
+# Minimal single-service deployment. Builds from source so it works straight
+# from a clone; swap `build: .` for the published image once you prefer:
+#   image: ghcr.io/akav-labs/agentsentry-gateway:latest
+services:
+  gateway:
+    build: .
+    # image: ghcr.io/akav-labs/agentsentry-gateway:latest
+    ports:
+      - "9003:9003"
+    environment:
+      UPSTREAM_BASE_URL: ${UPSTREAM_BASE_URL:-https://api.openai.com}
+      # Optional — gateway holds the key so clients need none. Leave unset for BYO-key.
+      UPSTREAM_API_KEY: ${UPSTREAM_API_KEY:-}
+      ATLAS_BLOCK: ${ATLAS_BLOCK:-false}
+      RUST_LOG: ${RUST_LOG:-info}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:9003/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
