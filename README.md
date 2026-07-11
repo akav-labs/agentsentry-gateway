@@ -21,6 +21,10 @@ Violations are blocked; clean traffic is forwarded to the real API, untouched.
 
 <img src="https://raw.githubusercontent.com/akav-labs/agentsentry-gateway/main/demo.gif" alt="AgentSentry Gateway blocking a jailbreak + AWS-key leak, and forwarding a clean request" width="840">
 
+<br>
+
+<sub>⭐ If this is useful, a star helps other people find it.</sub>
+
 </div>
 
 ---
