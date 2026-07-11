@@ -1,0 +1,29 @@
+name: Missed detection / evasion
+description: A prompt that should have been blocked got through.
+labels: ["detection", "evasion"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Bypasses are genuinely welcome — they're how the rules improve.
+        **Please redact real secrets** in any example (use obviously-fake values).
+  - type: textarea
+    id: payload
+    attributes:
+      label: The prompt / payload that got through
+      description: The request content that should have been blocked but was forwarded.
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: expected
+    attributes:
+      label: What should have caught it?
+      placeholder: "e.g. DLP (AWS key) · JBK (jailbreak) · INJ (injection) · AGT (tool abuse)"
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Why it evades (optional)
+      description: Encoding, phrasing, unicode trick, splitting across turns, etc.

@@ -1,0 +1,29 @@
+name: False positive
+description: A legitimate prompt was wrongly blocked.
+labels: ["false-positive"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        False positives are high priority here — a tool that cries wolf is worse
+        than no tool. Thanks for reporting.
+  - type: textarea
+    id: prompt
+    attributes:
+      label: The legitimate prompt that was blocked
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: rule
+    attributes:
+      label: Which rule fired?
+      description: From the 403 response's `agentsentry.rules` field.
+      placeholder: "e.g. DLP.X001 · JBK.004 · INJ.001"
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it's legitimate
+      description: Briefly, why this should be allowed.

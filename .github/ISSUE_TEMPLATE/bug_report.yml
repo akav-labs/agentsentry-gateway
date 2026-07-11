@@ -1,0 +1,47 @@
+name: Bug report
+description: The gateway itself misbehaves — crash, wrong forwarding, config, build.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve AgentSentry. For a **missed detection** or a
+        **false positive**, please use those dedicated templates instead — and
+        for a security vulnerability, see [SECURITY.md](../blob/main/SECURITY.md).
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Ideally the exact request (curl) and the gateway response/logs. Redact any real secrets.
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version / image tag / commit
+      placeholder: "v0.1.0  ·  ghcr.io/akav-labs/agentsentry-gateway:0.1.0  ·  commit sha"
+    validations:
+      required: true
+  - type: dropdown
+    id: how
+    attributes:
+      label: How are you running it?
+      options:
+        - Docker image
+        - docker compose
+        - cargo / from source
+    validations:
+      required: true
+  - type: input
+    id: upstream
+    attributes:
+      label: Upstream (UPSTREAM_BASE_URL)
+      placeholder: "OpenAI · Anthropic · Ollama · vLLM · other"
