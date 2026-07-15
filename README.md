@@ -112,6 +112,7 @@ All via environment variables (see [`.env.example`](./.env.example)):
 | `UPSTREAM_API_KEY` | *(empty)* | If set, the gateway injects it upstream (clients need no key). If empty, each client's own `Authorization` is passed through |
 | `LISTEN_ADDR` | `0.0.0.0:9003` | Bind address |
 | `ATLAS_BLOCK` | `false` | Also block on MITRE ATLAS matches (not just DLP/jailbreak/injection) |
+| `RESPONSE_BLOCK` | `false` | **Egress DLP.** Scan the model's *response* for leaked secrets/PII, exfil links, system-prompt disclosure, or jailbreak-success personas. Default is log-and-flag (`X-AgentSentry-Response-Flags` header); set `true` to **block** — the caller gets a `403` instead of the leaked content |
 | `RUST_LOG` | `info` | Log level |
 
 **Two modes:** *bring-your-own-key* (leave `UPSTREAM_API_KEY` empty — clients send

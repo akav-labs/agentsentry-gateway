@@ -55,6 +55,12 @@ struct AppConfig {
     /// When true, MITRE ATLAS technique matches also block (default: log only, like
     /// the reference deployment — ATLAS is broad and better as detection than a gate).
     atlas_block: bool,
+    /// When true, a response whose body trips a scan_response rule (leaked secret,
+    /// exfil link, system-prompt disclosure, jailbreak-success persona) is BLOCKED —
+    /// the caller gets a 403 error instead of the leaked content. Default false
+    /// (log-and-flag only) to preserve the transparent-proxy contract; flip it on
+    /// to enforce egress DLP.
+    response_block: bool,
 }
 
 #[derive(Clone)]
@@ -82,6 +88,7 @@ async fn main() {
         upstream_base_url: env_or("UPSTREAM_BASE_URL", "https://api.openai.com").trim_end_matches('/').to_string(),
         upstream_api_key: env_or("UPSTREAM_API_KEY", ""),
         atlas_block: env_or("ATLAS_BLOCK", "false") == "true",
+        response_block: env_or("RESPONSE_BLOCK", "false") == "true",
     };
     let listen = env_or("LISTEN_ADDR", "0.0.0.0:9003");
 
@@ -242,9 +249,30 @@ async fn proxy(State(s): State<AppState>, method: Method, uri: Uri, headers: Hea
     if resp_hits.is_empty() {
         headers_out.insert(HeaderName::from_static("x-agentsentry"), HeaderValue::from_static("clean"));
     } else {
-        tracing::warn!(agent = %agent, rules = ?resp_hits, "response scan flagged");
+        tracing::warn!(agent = %agent, rules = ?resp_hits, block = s.cfg.response_block, "response scan flagged");
         if let Ok(v) = HeaderValue::from_str(&resp_hits.join(",")) {
             headers_out.insert(HeaderName::from_static("x-agentsentry-response-flags"), v);
+        }
+        // Egress enforcement: don't hand the leaked content to the caller.
+        if s.cfg.response_block {
+            for r in &resp_hits { BLOCKS.with_label_values(&[r]).inc(); }
+            let flags = HeaderValue::from_str(&resp_hits.join(","))
+                .unwrap_or_else(|_| HeaderValue::from_static("response"));
+            return (
+                StatusCode::FORBIDDEN,
+                [
+                    (HeaderName::from_static("x-powered-by"), HeaderValue::from_static("AgentSentry Gateway (Akav Labs)")),
+                    (HeaderName::from_static("x-agentsentry-response-flags"), flags),
+                ],
+                Json(json!({
+                    "error": {
+                        "message": "Response blocked by AgentSentry: the model output tripped an egress DLP rule.",
+                        "type": "agentsentry_response_block",
+                        "code": "response_blocked"
+                    },
+                    "agentsentry": { "rules": resp_hits, "by": "Akav Labs" }
+                })),
+            ).into_response();
         }
     }
     (status, headers_out, rbytes).into_response()
