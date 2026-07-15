@@ -703,6 +703,18 @@ impl DlpEngine {
         (scanned, None, Vec::new())
     }
 
+    /// Build an incremental scanner for a live streaming (SSE) response. See
+    /// [`SseScanner`] — this is the wired-in, chunk-by-chunk counterpart to the
+    /// whole-body [`scan_sse`](Self::scan_sse).
+    pub fn sse_scanner(self: &std::sync::Arc<Self>) -> SseScanner {
+        SseScanner {
+            engine: std::sync::Arc::clone(self),
+            partial: String::new(),
+            window: String::new(),
+            tripped: false,
+        }
+    }
+
     /// Returns (id, name) pairs for all matches — used by /healthz and diagnostics
     #[allow(dead_code)]
     pub fn scan_with_names(&self, text: &str) -> Vec<(String, String)> {
@@ -715,6 +727,72 @@ impl DlpEngine {
 
     pub fn rule_count(&self) -> usize {
         self.ids.len()
+    }
+}
+
+/// Stateful, incremental scanner for a live streaming (SSE) response body.
+///
+/// Streaming tokens arrive as raw byte-chunks that do NOT align to SSE line or
+/// event boundaries, and a secret can be split across many `delta` events
+/// ("sk-" + "abc" + "def…"). This scanner buffers partial lines across chunks,
+/// accumulates `choices[0].delta.content` (OpenAI) / `delta.text` (Anthropic)
+/// into a rolling 500-char window, and after each delta scans the normalized
+/// window with the full response ruleset. [`push`](Self::push) returns the hit
+/// ids the moment a pattern completes — the point at which the proxy withholds
+/// the offending chunk and terminates the stream.
+///
+/// Note: tokens forwarded *before* the pattern completes have already reached
+/// the client (inherent to streaming); enforcement withholds the completing
+/// chunk and everything after it, so the full secret is never delivered intact.
+pub struct SseScanner {
+    engine: std::sync::Arc<DlpEngine>,
+    partial: String,
+    window: String,
+    tripped: bool,
+}
+
+impl SseScanner {
+    /// Feed the next raw chunk of the SSE body. Returns non-empty hit ids the
+    /// first time the rolling content window trips a response rule; empty
+    /// otherwise. Once tripped it stays tripped and returns empty.
+    pub fn push(&mut self, chunk: &str) -> Vec<String> {
+        if self.tripped {
+            return Vec::new();
+        }
+        self.partial.push_str(chunk);
+        while let Some(nl) = self.partial.find('\n') {
+            let line: String = self.partial.drain(..=nl).collect();
+            let data = match line.trim_end().strip_prefix("data:") {
+                Some(d) => d.trim(),
+                None => continue,
+            };
+            if data == "[DONE]" {
+                continue;
+            }
+            let delta = serde_json::from_str::<serde_json::Value>(data)
+                .ok()
+                .and_then(|v| {
+                    v["choices"][0]["delta"]["content"]
+                        .as_str()
+                        .or_else(|| v["delta"]["text"].as_str())
+                        .map(str::to_string)
+                })
+                .unwrap_or_default();
+            if delta.is_empty() {
+                continue;
+            }
+            self.window.push_str(&delta);
+            let n = self.window.chars().count();
+            if n > 500 {
+                self.window = self.window.chars().skip(n - 500).collect();
+            }
+            let hits = self.engine.scan_response(&normalize_for_detection(&self.window));
+            if !hits.is_empty() {
+                self.tripped = true;
+                return hits;
+            }
+        }
+        Vec::new()
     }
 }
 
@@ -1421,5 +1499,45 @@ mod tests {
         assert_eq!(scanned, 3);
         assert!(hit_at.is_none());
         assert!(hits.is_empty());
+    }
+
+    // ── Incremental (wired-in) streaming scanner ──────────────────────────────
+
+    #[test]
+    fn test_incremental_sse_scanner_split_secret() {
+        let e = std::sync::Arc::new(DlpEngine::new());
+        // AWS key split across three separate SSE events must trip once assembled.
+        let mut sc = e.sse_scanner();
+        let mut hit = Vec::new();
+        for ev in [
+            "data: {\"choices\":[{\"delta\":{\"content\":\"the key is AKIA\"}}]}\n\n",
+            "data: {\"choices\":[{\"delta\":{\"content\":\"IOSFODNN7\"}}]}\n\n",
+            "data: {\"choices\":[{\"delta\":{\"content\":\"EXAMPLE done\"}}]}\n\n",
+        ] {
+            let h = sc.push(ev);
+            if !h.is_empty() { hit = h; break; }
+        }
+        assert!(hit.iter().any(|r| r.starts_with("DLP.") || r.starts_with("RES.")),
+            "split secret across SSE events must be caught: {:?}", hit);
+    }
+
+    #[test]
+    fn test_incremental_sse_scanner_partial_line_buffering() {
+        // A byte-chunk boundary that falls in the MIDDLE of an SSE line must be
+        // buffered and reassembled, not dropped.
+        let e = std::sync::Arc::new(DlpEngine::new());
+        let mut sc = e.sse_scanner();
+        assert!(sc.push("data: {\"choices\":[{\"delta\":{\"content\":\"AKIA").is_empty(),
+            "incomplete line must not trip yet");
+        let hit = sc.push("IOSFODNN7EXAMPLE \"}}]}\n\n");
+        assert!(!hit.is_empty(), "reassembled line across chunk boundary must be caught");
+    }
+
+    #[test]
+    fn test_incremental_sse_scanner_clean() {
+        let e = std::sync::Arc::new(DlpEngine::new());
+        let mut sc = e.sse_scanner();
+        assert!(sc.push("data: {\"choices\":[{\"delta\":{\"content\":\"The capital of France is Paris.\"}}]}\n\n").is_empty());
+        assert!(sc.push("data: [DONE]\n\n").is_empty());
     }
 }

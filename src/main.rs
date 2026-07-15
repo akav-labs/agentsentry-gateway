@@ -228,13 +228,56 @@ async fn proxy(State(s): State<AppState>, method: Method, uri: Uri, headers: Hea
         .unwrap_or_else(|| HeaderValue::from_static("application/json"));
 
     if streaming {
-        // Pass the token stream straight through (request already scanned;
-        // streaming-response scanning is on the roadmap).
-        let mut out = Response::builder().status(status);
-        out = out.header("content-type", ct);
-        out = out.header("x-agentsentry", "clean");
-        out = out.header("x-powered-by", "AgentSentry Gateway (Akav Labs)");
-        return out.body(Body::from_stream(resp.bytes_stream()))
+        // Scan the token stream incrementally: accumulate delta content into a
+        // rolling window and scan after each chunk (catches secrets split across
+        // SSE events). In RESPONSE_BLOCK mode, the chunk that completes a leak is
+        // withheld and the stream is terminated with an error event; otherwise we
+        // log-and-forward. `x-agentsentry` reflects which.
+        let scanner = s.dlp.sse_scanner();
+        let block = s.cfg.response_block;
+        let upstream = Box::pin(resp.bytes_stream());
+        let scanned = futures::stream::unfold(
+            (upstream, scanner, false, agent.clone(), block),
+            |(mut up, mut scanner, done, agent, block)| async move {
+                use futures::StreamExt;
+                if done {
+                    return None;
+                }
+                match up.next().await {
+                    Some(Ok(chunk)) => {
+                        let hits = scanner.push(&String::from_utf8_lossy(&chunk));
+                        if !hits.is_empty() {
+                            tracing::warn!(agent = %agent, rules = ?hits, block, "streaming response scan flagged");
+                            if block {
+                                for r in &hits { BLOCKS.with_label_values(&[r]).inc(); }
+                                let ev = format!(
+                                    "data: {}\n\ndata: [DONE]\n\n",
+                                    json!({
+                                        "error": {
+                                            "message": "Response blocked by AgentSentry: streamed output tripped an egress DLP rule.",
+                                            "type": "agentsentry_response_block",
+                                            "code": "response_blocked"
+                                        },
+                                        "agentsentry": { "rules": hits, "by": "Akav Labs" }
+                                    })
+                                );
+                                // Withhold the offending chunk; emit the terminating event and stop.
+                                return Some((Ok(Bytes::from(ev)), (up, scanner, true, agent, block)));
+                            }
+                        }
+                        Some((Ok(chunk), (up, scanner, false, agent, block)))
+                    }
+                    Some(Err(e)) => Some((Err(e), (up, scanner, true, agent, block))),
+                    None => None,
+                }
+            },
+        );
+        let out = Response::builder()
+            .status(status)
+            .header("content-type", ct)
+            .header("x-powered-by", "AgentSentry Gateway (Akav Labs)")
+            .header("x-agentsentry", if block { "stream-enforced" } else { "stream-observed" });
+        return out.body(Body::from_stream(scanned))
             .unwrap_or_else(|_| StatusCode::BAD_GATEWAY.into_response());
     }
 

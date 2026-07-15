@@ -112,7 +112,7 @@ All via environment variables (see [`.env.example`](./.env.example)):
 | `UPSTREAM_API_KEY` | *(empty)* | If set, the gateway injects it upstream (clients need no key). If empty, each client's own `Authorization` is passed through |
 | `LISTEN_ADDR` | `0.0.0.0:9003` | Bind address |
 | `ATLAS_BLOCK` | `false` | Also block on MITRE ATLAS matches (not just DLP/jailbreak/injection) |
-| `RESPONSE_BLOCK` | `false` | **Egress DLP.** Scan the model's *response* for leaked secrets/PII, exfil links, system-prompt disclosure, or jailbreak-success personas. Default is log-and-flag (`X-AgentSentry-Response-Flags` header); set `true` to **block** — the caller gets a `403` instead of the leaked content |
+| `RESPONSE_BLOCK` | `false` | **Egress DLP.** Scan the model's *response* — including **streaming (SSE)** token-by-token — for leaked secrets/PII, exfil links, system-prompt disclosure, or jailbreak-success personas. Default is log-and-flag (`X-AgentSentry-Response-Flags` header); set `true` to **enforce**: a non-streaming leak returns `403`, and a streaming leak is cut off mid-stream (the chunk completing the secret is withheld) so the full secret is never delivered |
 | `RUST_LOG` | `info` | Log level |
 
 **Two modes:** *bring-your-own-key* (leave `UPSTREAM_API_KEY` empty — clients send
@@ -132,7 +132,9 @@ Detection is regex-based (linear / DFA — no catastrophic backtracking) and run
 entirely in-process, so it's cheap. A blocked request is scanned against **all 73
 DLP rules + 97 ATLAS techniques + the jailbreak/injection patterns** and rejected in
 **~0.75 ms (p50) / ~1.4 ms (p95)** on commodity hardware — with no network hop at
-all. Clean requests pay the same scan, then stream straight through to your upstream.
+all. Clean requests pay the same scan, then forward to your upstream. Streaming
+responses are scanned incrementally (a rolling window over the SSE deltas) so a
+secret split across tokens is still caught without buffering the whole reply.
 
 ## What's not here
 
