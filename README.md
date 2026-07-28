@@ -6,7 +6,8 @@
 
 [![CI](https://github.com/akav-labs/agentsentry-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/akav-labs/agentsentry-gateway/actions/workflows/ci.yml) &nbsp;
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE) &nbsp;
-[![Image](https://img.shields.io/badge/ghcr.io-agentsentry--gateway-blue?logo=docker)](https://github.com/akav-labs/agentsentry-gateway/pkgs/container/agentsentry-gateway)
+[![Image](https://img.shields.io/badge/ghcr.io-agentsentry--gateway-blue?logo=docker)](https://github.com/akav-labs/agentsentry-gateway/pkgs/container/agentsentry-gateway) &nbsp;
+[![Docker Hub](https://img.shields.io/docker/pulls/akavlabs/agentsentry-gateway?logo=docker&label=docker%20hub)](https://hub.docker.com/r/akavlabs/agentsentry-gateway)
 
 <br>
 
@@ -51,6 +52,7 @@ docker run -p 9003:9003 \
   -e UPSTREAM_BASE_URL=https://api.openai.com \
   ghcr.io/akav-labs/agentsentry-gateway:latest
 ```
+<sub>Also mirrored to [Docker Hub](https://hub.docker.com/r/akavlabs/agentsentry-gateway) — swap the image for `akavlabs/agentsentry-gateway:latest`.</sub>
 
 **docker compose:**
 ```bash
